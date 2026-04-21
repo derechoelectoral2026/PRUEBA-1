@@ -4,6 +4,24 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Simulacro INE – Módulo D · v4 (Aleatorio)</title>
+
+<!-- ═══════════════════════════════════════════════════════
+  CONFIGURACIÓN DEL SIMULACRO
+  Solo cambia estas líneas para ajustar el simulacro:
+    BANCO_URL  → URL raw del archivo JS en GitHub
+    MODULO     → Nombre visible del módulo
+    TIEMPO_MIN → Duración en minutos
+    N_PREGUNTAS → Preguntas que aparecen (el banco puede tener más)
+════════════════════════════════════════════════════════ -->
+<script>
+  const CONFIG = {
+    BANCO_URL:    'https://raw.githubusercontent.com/derechoelectoral2026/Bancos-Spen/main/banco-modulo-dvoe.js',
+    MODULO:       'Módulo D — Vocalía de Organización Electoral',
+    SUBTITULO:    'Conocimientos técnicos del cargo · Diagnóstico',
+    TIEMPO_MIN:   50,
+    N_PREGUNTAS:  40   // ← el banco tiene 50; el examen muestra 40
+  };
+</script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: 'Segoe UI', sans-serif; background: #f0fff4; color: #222; min-height: 100vh; }
@@ -91,7 +109,6 @@
   @media(max-width:500px){ .info-grid,.stats-grid{grid-template-columns:1fr 1fr} .topic-grid{grid-template-columns:1fr} }
 </style>
 </head>
-<!-- Banco externo: <script src="banco-modulo-d-v4.js"></script> -->
 <body>
 <div class="header">
   <div class="header-logo">📂</div>
@@ -110,8 +127,8 @@
     <h2>📂 Módulo D — Conocimientos técnicos del cargo</h2>
     <p style="background:#e8f5e9;border-radius:10px;padding:10px;color:#1b5e20;font-weight:600;margin-bottom:14px">🎯 Este módulo evalúa lo más operativo del puesto. ¡Es clave dominarlo! · <strong>🔀 Preguntas en orden aleatorio cada vez</strong></p>
     <div class="info-grid">
-      <div class="info-card"><div class="num">40</div><div class="lbl">Preguntas</div></div>
-      <div class="info-card"><div class="num">50</div><div class="lbl">Minutos</div></div>
+      <div class="info-card"><div class="num" id="infoPreguntas">40</div><div class="lbl">Preguntas</div></div>
+      <div class="info-card"><div class="num" id="infoMinutos">50</div><div class="lbl">Minutos</div></div>
       <div class="info-card"><div class="num">5</div><div class="lbl">Áreas</div></div>
     </div>
     <div class="topic-section">
@@ -159,23 +176,46 @@
     <button class="btn btn-primary" id="btnNext" onclick="nextQ()">Siguiente →</button>
   </div>
 </div>
-<script src="banco-modulo-d.js"></script>
 <script>
-/* Motor del simulacro — banco en banco-modulo-d.js · Vocalía de Organización Electoral
-   50 preguntas · el simulacro selecciona 40 de forma proporcional
-   Fuentes: LGIPE (2024) · RE INE (2025) · LGMDE (2021) · CPEUM (2025)
-══════════════════════════════════════════════════════════════════ */
-// Banco cargado desde banco-modulo-d.js
+// ═══════════════════════════════════════════════════════════
+//  CARGA DINÁMICA DEL BANCO DESDE GITHUB
+// ═══════════════════════════════════════════════════════════
+let BANK = [];
+
+async function cargarBanco() {
+  try {
+    const res = await fetch(CONFIG.BANCO_URL + '?v=' + Date.now());
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const code = await res.text();
+
+    // El banco exporta la variable BANK
+    const fn = new Function(code + '\n return BANK;');
+    const banco = fn();
+
+    if (!banco || !Array.isArray(banco) || banco.length === 0) {
+      throw new Error('Banco vacío o nombre de variable incorrecto.');
+    }
+
+    BANK = banco;
+    inicializarSimulacro();
+
+  } catch (err) {
+    console.error('Error cargando banco:', err);
+    document.getElementById('loadingScreen').classList.add('hidden');
+    document.getElementById('errorScreen').classList.remove('hidden');
+    document.getElementById('errorUrl').textContent = CONFIG.BANCO_URL;
+  }
+}
 
 /* ══════════════════════════════════════════════════════════════════
    MOTOR DEL SIMULACRO
    N_EXAMEN = 40  ← número de preguntas que aparecen en el examen real
 ══════════════════════════════════════════════════════════════════ */
-const N_EXAMEN   = 40;
-const TIME_LIMIT = 50 * 60;
+
+// TIME_LIMIT se calcula desde CONFIG
 
 let Q = [], answers = [], revealed = [], current = 0;
-let timerInterval = null, secondsLeft = TIME_LIMIT;
+let timerInterval = null, secondsLeft = CONFIG.TIEMPO_MIN * 60;
 
 function shuffleArray(arr) {
   const a = [...arr];
@@ -195,7 +235,7 @@ function buildQ() {
   const byArea = {};
   BANK.forEach(q => { if (!byArea[q.sa]) byArea[q.sa] = []; byArea[q.sa].push(q); });
   const keys = Object.keys(byArea).sort();
-  const total = BANK.length, N = N_EXAMEN;
+  const total = BANK.length, N = CONFIG.N_PREGUNTAS;
   const quotas = {};
   let assigned = 0;
   keys.forEach(k => { quotas[k] = Math.floor(byArea[k].length / total * N); assigned += quotas[k]; });
@@ -228,13 +268,22 @@ const SS = {
   "5.2":{bg:"#e1f5fe",color:"#01579b",icon:"📊"}
 };
 
+function inicializarSimulacro() {
+  document.getElementById('loadingScreen').classList.add('hidden');
+  document.getElementById('startScreen').classList.remove('hidden');
+  document.getElementById('navTotal').textContent = CONFIG.N_PREGUNTAS;
+  document.getElementById('infoPreguntas').textContent = CONFIG.N_PREGUNTAS;
+  document.getElementById('infoMinutos').textContent = CONFIG.TIEMPO_MIN;
+  document.getElementById('timer').textContent = String(CONFIG.TIEMPO_MIN).padStart(2,'0') + ':00';
+}
+
 function startExam() {
   if (timerInterval) clearInterval(timerInterval);
   Q = buildQ();
   answers     = new Array(Q.length).fill(null);
   revealed    = new Array(Q.length).fill(false);
   current     = 0;
-  secondsLeft = TIME_LIMIT;
+  secondsLeft = CONFIG.TIEMPO_MIN * 60;
   document.getElementById('startScreen').classList.add('hidden');
   document.getElementById('examScreen').classList.remove('hidden');
   document.getElementById('navBar').classList.remove('hidden');
@@ -295,6 +344,8 @@ function startTimer() {
     if (secondsLeft <= 0) { clearInterval(timerInterval); showResults(); }
   }, 1000);
 }
+  }, 1000);
+}
 
 function showResults() {
   clearInterval(timerInterval);
@@ -326,7 +377,7 @@ function showResults() {
     return `<div class="area-row"><div class="area-name">${icon} ${name}</div><div class="area-bar-wrap"><div class="area-bar" style="width:${p}%;background:${bc}"></div></div><div class="area-pct" style="color:${p>=60?'#1b5e20':'#c62828'}">${p}%</div></div>`;
   }).join('');
   const wb = weak.length ? `<div class="weak-banner"><h4>🎯 Estudia esto primero:</h4><p>Menos del 60% en estas subáreas. Son las más operativas del cargo.</p><div class="weak-tags">${weak.map(t=>`<span class="weak-tag">📌 ${t}</span>`).join('')}</div></div>` : `<div style="background:#e8f5e9;border-radius:10px;padding:14px;margin:14px 0;color:#1b5e20;font-weight:600">✅ ¡Dominas todas las áreas técnicas del cargo!</div>`;
-  const elapsed = Math.max(0, TIME_LIMIT - secondsLeft);
+  const elapsed = Math.max(0, CONFIG.TIEMPO_MIN * 60 - secondsLeft);
   const tm = Math.floor(elapsed/60), ts = elapsed%60;
   document.getElementById('resultsScreen').innerHTML = `
     <div class="results-screen">
@@ -360,6 +411,8 @@ function reviewExam() {
   renderQuestion(0);
   window.scrollTo(0, 0);
 }
+
+cargarBanco();
 </script>
 </body>
 </html>
