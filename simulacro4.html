@@ -123,7 +123,19 @@
 </div>
 <div class="progress-wrap"><div class="progress-bar" id="progressBar" style="width:0%"></div></div>
 <div class="main">
-  <div class="start-screen" id="startScreen">
+  <div id="loadingScreen" style="text-align:center;padding:60px 20px">
+    <div style="font-size:2rem;margin-bottom:16px">⏳</div>
+    <p style="color:#1b5e20;font-weight:700;font-size:1rem">Cargando banco de preguntas...</p>
+    <p style="color:#888;font-size:0.8rem;margin-top:6px">Conectando con GitHub</p>
+  </div>
+  <div id="errorScreen" class="hidden" style="background:white;border-radius:14px;padding:30px;text-align:center;margin-top:20px">
+    <div style="font-size:2.5rem;margin-bottom:12px">⚠️</div>
+    <h3 style="color:#c62828;margin-bottom:8px">No se pudo cargar el banco</h3>
+    <p style="color:#666;font-size:0.85rem;margin-bottom:12px">Verifica tu conexión a internet o que la URL sea correcta.</p>
+    <p style="font-size:0.78rem;color:#888;margin-bottom:16px">URL:<br><code id="errorUrl" style="word-break:break-all;color:#1b5e20"></code></p>
+    <button class="btn btn-primary" onclick="cargarBanco()">🔄 Reintentar</button>
+  </div>
+  <div class="start-screen hidden" id="startScreen">
     <h2>📂 Módulo D — Conocimientos técnicos del cargo</h2>
     <p style="background:#e8f5e9;border-radius:10px;padding:10px;color:#1b5e20;font-weight:600;margin-bottom:14px">🎯 Este módulo evalúa lo más operativo del puesto. ¡Es clave dominarlo! · <strong>🔀 Preguntas en orden aleatorio cada vez</strong></p>
     <div class="info-grid">
@@ -279,6 +291,7 @@ function inicializarSimulacro() {
 
 function startExam() {
   if (timerInterval) clearInterval(timerInterval);
+  if (!BANK || BANK.length === 0) { alert("El banco no está cargado. Recarga la página."); return; }
   Q = buildQ();
   answers     = new Array(Q.length).fill(null);
   revealed    = new Array(Q.length).fill(false);
